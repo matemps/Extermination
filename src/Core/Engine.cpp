@@ -1,0 +1,111 @@
+#include "Engine.h"
+#include "../Graphics/TextureManager.h"
+#include "../Input/Input.h"
+#include "../Timer/Timer.h"
+#include "../Characters/Warrior.h"
+#include "../Map/MapParser.h"
+#include "../Camera/Camera.h"
+#include <iostream>
+#include "SDL.h"
+#include "SDL_image.h"
+
+Engine* Engine::s_Instance = nullptr;
+Warrior* player = nullptr;
+
+void Engine::Init()
+{
+     if (SDL_Init(SDL_INIT_VIDEO) != 0)
+     {
+          SDL_Log("Failed to initialize SDL: %s", SDL_GetError());
+          return;
+     }
+
+     int imgFlags = IMG_INIT_JPG | IMG_INIT_PNG;
+
+     if ((IMG_Init(imgFlags) & imgFlags) != imgFlags)
+     {
+          SDL_Log("Failed to initialize SDL_image: %s", IMG_GetError());
+          return;
+     }
+
+     m_Window = SDL_CreateWindow(
+          "Exterminator",
+          SDL_WINDOWPOS_CENTERED,
+          SDL_WINDOWPOS_CENTERED,
+          SCREEN_WIDTH,
+          SCREEN_HEIGHT,
+          0
+     );
+     if (m_Window == nullptr)
+     {
+          SDL_Log("Failed to create window: %s", SDL_GetError());
+          return;
+     }
+
+     m_Renderer = SDL_CreateRenderer(
+          m_Window,
+          -1,
+          SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
+     );
+     if (m_Renderer == nullptr)
+     {
+          SDL_Log("Failed to create renderer: %s", SDL_GetError());
+          return;
+     }
+
+     if (!MapParser::GetInstance()->Load())
+     {
+          std::cout << "Failed to load map" << std::endl;
+     }
+
+     m_LevelMap = MapParser::GetInstance()->GetMap("MAP");
+
+     TextureManager::GetInstance()->Load("player", "assets/idle2.png");
+     TextureManager::GetInstance()->Load("player_run", "assets/running.png");
+     TextureManager::GetInstance()->Load("Bulb Corridor", "assets/images/Bulb Corridor.png");
+
+     player = new Warrior(new Properties("player", 100, 200, 26, 43));
+
+     Camera::GetInstance()->SetTarget(player->GetOrigin());
+
+     m_IsRunning = true;
+}
+
+void Engine::Events()
+{
+     Input::GetInstance()->Listen();
+}
+
+void Engine::Render()
+{
+     SDL_SetRenderDrawColor(m_Renderer, 124, 218, 254, 255);
+     SDL_RenderClear(m_Renderer);
+
+     TextureManager::GetInstance()->DrawBackground("Bulb Corridor", 256, 193);
+
+     m_LevelMap->Render();
+     player->Draw();
+     SDL_RenderPresent(m_Renderer);
+}
+
+void Engine::Update()
+{
+     float dt = Timer::GetInstance()->GetDeltaTime();
+     m_LevelMap->Update();
+     player->Update(dt);
+     Camera::GetInstance()->Update(dt);
+}
+
+void Engine::Clean()
+{
+     TextureManager::GetInstance()->Clean();
+     SDL_DestroyRenderer(m_Renderer);
+     SDL_DestroyWindow(m_Window);
+     IMG_Quit();
+     SDL_Quit();
+}
+
+void Engine::Quit()
+{
+     m_IsRunning = false;
+}
